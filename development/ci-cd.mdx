@@ -1,0 +1,67 @@
+---
+title: "CI/CD Pipeline"
+description: "How KARIANA's CI/CD works with self-hosted runners"
+---
+
+# CI/CD Pipeline
+
+KARIANA uses self-hosted GitHub Actions runners for CI/CD. All builds, tests, and deployments run on our own infrastructure — no GitHub-hosted runner minutes needed.
+
+## Available Runners
+
+| Label | OS | Use Case |
+|-------|-----|----------|
+| `[self-hosted, linux, tato, general]` | Linux | CI, builds, tests, Docker |
+| `[self-hosted, linux, tato, gpu]` | Linux + GPU | LLM inference, model builds |
+| `[self-hosted, windows, tato, windows-build]` | Windows | Inno Setup, Electron Windows builds |
+
+## Writing Workflows
+
+When adding or modifying a GitHub Actions workflow, use self-hosted runners instead of GitHub-hosted ones:
+
+```yaml
+jobs:
+  build:
+    # Instead of: runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, tato, general]
+    steps:
+      - uses: actions/checkout@v4
+      # ... your steps
+```
+
+### Platform-specific builds
+
+```yaml
+strategy:
+  matrix:
+    include:
+      - platform: linux
+        runner: '["self-hosted","linux","tato","general"]'
+      - platform: win
+        runner: '["self-hosted","windows","tato","windows-build"]'
+      - platform: mac
+        runner: '["self-hosted","linux","tato","general"]'
+        # macOS is cross-compiled from Linux
+
+jobs:
+  build:
+    runs-on: ${{ fromJSON(matrix.runner) }}
+```
+
+## Caching
+
+Self-hosted runners keep their workspace between runs, so:
+
+- **Tool installations** (Node, Python) are cached automatically
+- **node_modules** and build artifacts persist — no full reinstall on every run
+- **actions/cache** still works if needed for cross-job caching
+
+## macOS Builds
+
+macOS desktop builds are cross-compiled from Linux. The resulting .dmg is unsigned (expected for pre-alpha). macOS users should go to **System Settings > Privacy & Security > Open Anyway** on first launch.
+
+## Security Notes
+
+- Self-hosted runners are restricted to **private repos only**
+- Public repos cannot trigger jobs on self-hosted runners
+- Never store secrets in workflow files — use GitHub Secrets
