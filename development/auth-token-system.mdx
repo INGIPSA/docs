@@ -1,0 +1,132 @@
+---
+title: 'Auth Token System'
+description: 'Offline-capable license verification for the KARIANA UE plugin'
+---
+
+## Overview
+
+Users authenticate once online via Clerk, receive a signed token cached locally, then work offline for up to 30 days.
+
+```
+┌─────────────┐     ┌──────────────┐     ┌────────────────────────┐
+│ UE Plugin   │     │ K9 Daemon    │     │ Clerk (cloud)          │
+│             │     │              │     │                        │
+│ Auth check  │◄────│ Token file   │◄────│ OAuth callback         │
+│ on startup  │     │ generation   │     │ (user_id, tier, email) │
+└─────────────┘     └──────────────┘     └────────────────────────┘
+```
+
+## Auth Flow
+
+1. **Plugin starts** — `UKarianaAuthToken::LoadAndVerify()` reads token from disk
+2. **No token** — Auth screen shows "Login to Kariana" + "Setup Local Model" pills
+3. **Expired token** — Auth screen shows "Your subscription seems expired!" + "Login to Kariana"
+4. **Invalid/tampered token** — Same as no token (auth screen)
+5. **Valid token** — Welcome screen with quick-action cards (normal use)
+
+### Login sequence
+
+1. User clicks "Login to Kariana" → browser opens `https://app.kariana.ai/sign-in`
+2. User authenticates via Clerk (Google or Email)
+3. Clerk callback reaches K9 daemon with user claims
+4. Daemon calls `token_generator.generate_token()` → signs with HMAC-SHA256
+5. Token saved to disk → plugin polls every 2s → detects it → unlocks
+
+### Setup Local Model
+
+1. User clicks "Setup Local Model"
+2. If no token exists (never authenticated) → error: "You need internet connection for the first time"
+3. If token exists (even expired) → opens plugin Project Settings + local model docs
+
+## Token Format
+
+```json
+{
+  "payload": {
+    "user_id": "clerk_user_abc123",
+    "email": "user@example.com",
+    "tier": "solo",
+    "issued_at": "2026-03-26T12:00:00Z",
+    "expires_at": "2026-04-25T12:00:00Z"
+  },
+  "signature": "91368c674df621aec225949b0adf31875ed68dd12317995b529f81f1d0018a2d"
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `user_id` | Clerk user ID |
+| `email` | User email |
+| `tier` | `free`, `solo`, `pro`, `enterprise` |
+| `issued_at` | ISO 8601 timestamp |
+| `expires_at` | 30 days from issue (configurable) |
+| `signature` | HMAC-SHA256 hex of canonical payload JSON |
+
+## Token File Locations
+
+| Platform | Path |
+|----------|------|
+| Windows | `%LOCALAPPDATA%\KARiANA\.kariana_token` |
+| macOS | `~/Library/Application Support/KARiANA/.kariana_token` |
+| Linux | `~/.config/KARiANA/.kariana_token` |
+
+## Source Files
+
+| File | Purpose |
+|------|---------|
+| `Source/KARIANARuntime/Public/Secure/KarianaAuthToken.h` | C++ token model + verification API |
+| `Source/KARIANARuntime/Private/Secure/KarianaAuthToken.cpp` | HMAC-SHA256, file I/O, expiry logic |
+| `Source/UnrealAssistantIntegration/Private/Widgets/SKarianaAuthScreen.h/.cpp` | Auth gate UI |
+| `Content/Python/licensing/token_generator.py` | Server-side generation |
+| `Content/Python/licensing/test_token_generator.py` | 24 unit tests |
+
+## Subscription Tiers
+
+| Tier | Status | Description |
+|------|--------|-------------|
+| `free` | Future | Free tier |
+| `solo` | Active | Solo subscription (pre-release) |
+| `pro` | Future | Pro tier |
+| `enterprise` | Active | Enterprise (contact sales) |
+
+## Security
+
+- Token is **signed, not encrypted** — users can read their tier but cannot modify it
+- Signing key is obfuscated in the plugin binary (XOR with `0xA7` mask)
+- Constant-time comparison prevents timing attacks
+- Token expiry checked against UTC — clock manipulation is a known limitation
+
+<Warning>
+**Before shipping to production**, replace the placeholder signing key in:
+- `KarianaAuthToken.cpp` — `OBFUSCATED_KEY[]` (XOR each byte of real key with `0xA7`)
+- `token_generator.py` — set `KARIANA_TOKEN_SIGNING_KEY` env var on the server
+
+The placeholder key is `0x53, 0x62, 0x75, 0x46, 0x57, 0x64, 0x73, 0x42, 0x51, 0x60, 0x7F, 0x4E, 0x5D, 0x6C, 0x7B, 0x4A` (repeated). Replace with a cryptographically random 32-byte key.
+</Warning>
+
+## Testing
+
+### Python unit tests
+
+```bash
+cd Content/Python
+python -m pytest licensing/test_token_generator.py -v
+```
+
+### Manual token generation
+
+```bash
+python -m licensing.token_generator --user-id test_001 --email test@kariana.ai --tier solo --days 30 --save
+```
+
+### Daemon command
+
+```json
+{"cmd": "auth_callback", "user_id": "clerk_user_abc123", "email": "user@kariana.ai", "tier": "solo"}
+```
+
+Response:
+
+```json
+{"type": "auth_success", "user_id": "clerk_user_abc123", "tier": "solo", "token_path": "..."}
+```
