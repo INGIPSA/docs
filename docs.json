@@ -48,7 +48,8 @@
           {
             "group": "Development",
             "pages": [
-              "development/ci-cd"
+              "development/ci-cd",
+              "development/auth-token-system"
             ]
           }
         ]
