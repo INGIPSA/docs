@@ -1,0 +1,49 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+    branches: [main]
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  claude-review:
+    if: github.event.pull_request.draft == false
+    runs-on: [self-hosted, linux, tato, general]
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          use_bedrock: false
+          use_vertex: false
+
+          prompt: |
+            Review this documentation PR for the KARIANA team docs (Mintlify site).
+
+            Focus on:
+            - Accuracy of technical content
+            - Broken links or missing page references in docs.json
+            - MDX syntax issues
+            - Inconsistent formatting or structure
+            - Missing or incorrect code examples
+
+            Be concise. Only flag real issues (confidence >= 80).
+            Post a summary comment using gh pr comment.
+
+          claude_args: '--allowedTools "Bash(gh:*),Bash(git:*),Read,Glob,Grep"'
