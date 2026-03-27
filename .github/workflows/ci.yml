@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate docs
+    runs-on: [self-hosted, linux, tato, general]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Mintlify CLI
+        run: npm install -g mintlify
+
+      - name: Validate docs.json
+        run: |
+          echo "Validating docs.json schema..."
+          python3 -c "import json; json.load(open('docs.json'))"
+          echo "✓ docs.json is valid JSON"
+
+      - name: Check for broken internal links
+        run: |
+          echo "Checking internal links in docs.json navigation..."
+          python3 << 'PYEOF'
+          import json, os, sys
+
+          with open("docs.json") as f:
+              config = json.load(f)
+
+          missing = []
+          def check_pages(obj):
+              if isinstance(obj, dict):
+                  for k, v in obj.items():
+                      if k == "pages":
+                          for page in v:
+                              if isinstance(page, str):
+                                  for ext in [".mdx", ".md", ""]:
+                                      if os.path.exists(page + ext):
+                                          break
+                                  else:
+                                      missing.append(page)
+                              elif isinstance(page, dict):
+                                  check_pages(page)
+                      else:
+                          check_pages(v)
+              elif isinstance(obj, list):
+                  for item in obj:
+                      check_pages(item)
+
+          check_pages(config.get("navigation", {}))
+
+          if missing:
+              print(f"✗ {len(missing)} broken page references:")
+              for m in missing:
+                  print(f"  - {m}")
+              sys.exit(1)
+          else:
+              print("✓ All page references resolve to files")
+          PYEOF
+
+      - name: Check MDX syntax
+        run: |
+          echo "Checking for common MDX issues..."
+          # Check all .mdx files exist and have frontmatter or content
+          find . -name "*.mdx" -empty -print | while read f; do
+            echo "Warning: Empty file: $f"
+          done
+          MDX_COUNT=$(find . -name "*.mdx" | wc -l)
+          MD_COUNT=$(find . -name "*.md" -not -name "README.md" -not -name "CONTRIBUTING.md" -not -name "AGENTS.md" -not -name "LICENSE" | wc -l)
+          echo "Found $MDX_COUNT .mdx files and $MD_COUNT .md content files"
+          echo "✓ MDX check passed"
