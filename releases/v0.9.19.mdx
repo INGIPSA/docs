@@ -1,0 +1,27 @@
+---
+title: "v0.9.19"
+description: "Stability release: MQTT removal, missing plugin deps, broken Python imports, Bedrock tool reduction"
+---
+
+Released **2026-04-14** ([PR #459](https://github.com/INGIPSA/KARIANA/pull/459)).
+
+## Highlights
+
+- **MQTT telemetry removed.** MQTT was stubbed out to unblock the plugin build ([PR #458](https://github.com/INGIPSA/KARIANA/pull/458)) and then fully removed in #459. Telemetry is no longer transported over MQTT — the broker dependency is gone from packaging and runtime.
+- **Missing plugin dependencies added.** The packaged plugin lacked declarations for several dependent plugins, causing module-load failures on fresh installs. Dependency manifest now lists the full set required by the runtime.
+- **Broken Python imports fixed.** Several `kariana.*` modules were importing relocated symbols. Imports re-aligned with the post-refactor layout.
+- **Bedrock tool count reduced.** The tool catalogue exposed to Bedrock was trimmed to stay below provider limits and reduce per-call token overhead.
+
+## Why this release matters
+
+0.9.19 was the first cut after the MQTT removal decision and surfaced several issues that did not appear during developer-branch testing because Intermediate/ artefacts masked the missing deps. See [Fresh install verification](/development/fresh-install-verification) for the procedure that now catches these.
+
+## Operational notes
+
+- Telemetry: existing MQTT broker config in user INI files is silently ignored. No migration needed.
+- Bedrock tool list is defined in the provider config; if you add a tool, verify it does not push the count back over the provider limit.
+
+## Related
+
+- [v0.9.20](/releases/v0.9.20) — version bump only
+- [v0.9.21](/releases/v0.9.21) — Bedrock endpoint recovery

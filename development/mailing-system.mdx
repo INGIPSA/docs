@@ -1,0 +1,35 @@
+---
+title: "Mailing system"
+description: "Production email flow: Resend templates, drip cron, Clerk webhook, unsubscribe"
+---
+
+The production email flow landed on kariana-landing between 2026-04-11 and 2026-04-13. This replaces the ad-hoc scripts used for the earlier wishlist blasts.
+
+## Stack
+
+- **Resend** for delivery and templates.
+- **Clerk webhook** triggers activation emails on sign-up / entitlement change.
+- **Vercel cron** runs the drip campaign.
+- `/api/email/unsubscribe` handles one-click unsubscribe; added to the public routes allowlist (commit `57cfd53`).
+
+## Deployment notes (lessons learned)
+
+Several debug cycles on 2026-04-11 chased env-var propagation issues. The durable fixes:
+
+- **Lazy-init the Resend client** (commit `1ba1f92`) so env vars are read at runtime, not at module load. Top-level `new Resend(process.env.X)` broke when the module was imported before env was hydrated.
+- **Redeploy with `--value` env vars** when adding new keys (commit `29b7a2a`) — referencing a secret that doesn't exist yet will silently skip it.
+- **Clerk webhook secret** must be present before the Marketplace integration is enabled, otherwise handshake fails (commit `564c647`).
+- Debug endpoints used during that session (`b55bc8c`, `ddb2fa3`, `dd5341c`) were removed in `4ca3294` — do not re-introduce them as leftover debugging.
+
+## Admin batch trigger (PR #10)
+
+`feat: admin batch-trigger UI for wishlist activation emails` (commit `a8e6fa7`) — gated by `ADMIN_USER_IDS`, lets us fire activation emails for a selected batch without running a local script. Used for the SOLO launch cohort.
+
+## Templates
+
+Templates are co-located with the routes that send them. If you add a new email type, pick a Resend template ID and keep the React-Email source in the repo so it can be diffed.
+
+## See also
+
+- `project_mailing_system_2026_04` memory entry for the division of labour and branch history
+- `reference_clerk_team_ids` for the admin allowlist

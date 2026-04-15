@@ -1,0 +1,30 @@
+---
+title: "Windows installer variants"
+description: "Why only the Light variant is built, and what the installer now asks the user"
+---
+
+The KARIANA-installer repo builds the Windows installers. As of 2026-04-14 only the **Light** variant is produced; the Full variant is disabled in CI.
+
+## Why Light-only
+
+The Full variant bundled extra runtime assets that have since moved to CDN delivery, leaving a ~5× size difference with no user-visible benefit. Until there is a concrete reason to re-enable Full, CI skips it to keep release artefacts small and build times short.
+
+The disable lives in the KARIANA-installer CI workflow (PR #8). Flip the job back on if Full is ever needed again — the pipeline still works, it is just not invoked.
+
+## Installer UX changes (2026-04-08)
+
+A sequence of PRs (#3–#7) reshaped the wizard:
+
+- **UE version + install target selection** — user picks which UE install to plug into and whether this is a per-user or per-engine install.
+- **DPI-aware layout** using `ScaleX` / `ScaleY`, right-anchored buttons — previous wizard was unreadable on high-DPI displays.
+- **Wizard page layout spacing and alignment** cleaned up.
+- **PowerShell invocation hardened** — `-NonInteractive` + logging to stop a hang that could occur when a step waited on stdin.
+- **Config write moved to `ssInstall`** (from `ssPostInstall`) so the config is present when `[Run]` steps execute.
+
+## CI infrastructure
+
+All workflow jobs now run on **GitHub-hosted runners** (PR #2). The previous self-hosted setup was retired — no more runner-down alerts. Desktop exe download pattern was widened to match the current `KarianaSetup*` naming (PR #8).
+
+## Artefact naming
+
+The download page now points to CloudFront CDN and the setup wizard links to canonical URLs from a single constants file in the landing repo. Don't hand-craft download URLs in docs — reference the constants.

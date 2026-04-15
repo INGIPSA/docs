@@ -1,0 +1,27 @@
+---
+title: "SOLO tier billing (Stripe + Clerk)"
+description: "How the solo tier is wired across the plugin, the landing site, and Clerk Billing"
+---
+
+The SOLO tier went live on the landing site 2026-04-14. This page captures how the pieces fit together.
+
+## Pieces
+
+- **Stripe** — products/prices live in the **INGI P.S.A sandbox** account (commit `053c496`, switched over 2026-04-14). Fresh products were created for SOLO; no reuse of the earlier test catalogue.
+- **Clerk Billing** — the landing site uses `has()` checks to gate access to the dashboard. All `has()` calls are guarded by `isLoaded` (commit `0d4d791`) because an unguarded check during Clerk hydration returned false and flashed the wrong state.
+- **Plugin-side licensing** — the Stripe-based licensing scaffolding landed earlier (commits `bad91f4`, `2d52e8f`, 2026-04-02/03). The plugin checks license state at boot; enforcement hooks are wired but the gate is currently permissive while we pilot.
+
+## Checkout flow
+
+1. Pricing page "GET STARTED" → `/api/checkout` (fix `371be35` got the button wiring right).
+2. Checkout route has explicit error handling so Stripe errors surface to the user rather than vanishing (commit `8c2354c`).
+3. Clerk Billing records the entitlement on successful session completion.
+4. Dashboard shows a loading state while Clerk initialises (commit `0e84474`) to avoid a "you don't have access" flash during hydration.
+
+## Known bugs addressed this week
+
+Five bugs from an E2E test run were fixed in commit `d160074` on 2026-04-14 — Piotr drove that pass. Check that commit message for the specific fixes if you hit a regression.
+
+## Where credentials live
+
+See the team-docs `reference_clerk_test_account.md` memory entry for Clerk test account details and the Clerk user IDs allowed as `ADMIN_USER_IDS`. Stripe keys are in Vercel env vars (sandbox account) — do not copy them into code.

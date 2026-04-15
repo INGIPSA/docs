@@ -49,7 +49,22 @@
             "group": "Development",
             "pages": [
               "development/ci-cd",
-              "development/auth-token-system"
+              "development/auth-token-system",
+              "development/bedrock-endpoint-recovery",
+              "development/pie-runtime-tools",
+              "development/chat-ui-fixes",
+              "development/macos-installer",
+              "development/windows-installer-variants",
+              "development/solo-tier-billing",
+              "development/mailing-system"
+            ]
+          },
+          {
+            "group": "Releases",
+            "pages": [
+              "releases/v0.9.21",
+              "releases/v0.9.20",
+              "releases/v0.9.19"
             ]
           }
         ]

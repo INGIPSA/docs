@@ -1,0 +1,31 @@
+---
+title: "macOS installer"
+description: "Native .pkg installer for the KARIANA UE plugin on macOS"
+---
+
+A native macOS `.pkg` installer landed 2026-04-08 (commit `6f8cb08`, Bartosz) with follow-up fixes the same day. Before this, macOS users had to run the Windows-centric path manually.
+
+## What it does
+
+- Copies the plugin into the selected UE install's `Plugins/` directory.
+- Sets up the bundled Python venv at the expected path.
+- Drops the Bedrock client config with the correct API Gateway host.
+- Copies the shipped binaries (previously the script was pulling from the wrong path).
+
+## Fixes shipped alongside the initial release
+
+- **Python 3.9 compat** — macOS UE ships 3.9; a couple of 3.10-only idioms had slipped in.
+- **Token path alignment** — the auth token cache path on macOS was not matching what the plugin actually read.
+- **API Gateway URL / auth route / verification URI** corrected for the macOS build.
+- **Installer version fallback** — `.pkg` no longer hard-fails if the version file is unreadable.
+- **Selective file copy** — stops copying the entire staging tree, just the files the plugin actually needs.
+- **Echo broken-pipe** fix in the install script.
+
+## 0.9.19 fix pass
+
+When 0.9.19 went out, the macOS installer needed another round: MQTT removal, venv path, binaries, Bedrock config (commit `d96323e`, 2026-04-08). That is the version currently recommended for macOS testers.
+
+## Known limits
+
+- No notarisation yet — expect Gatekeeper prompts on fresh machines.
+- No auto-update; follows the same manual-reinstall model as the Windows installer until [#465](https://github.com/INGIPSA/KARIANA/issues/465) lands.
