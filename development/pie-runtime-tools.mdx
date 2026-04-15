@@ -1,0 +1,36 @@
+---
+title: "PIE-safe runtime tools"
+description: "Runtime actor manipulation during Play-In-Editor and the Python → C++ dispatch redirect"
+---
+
+Bartosz landed a sequence of changes between 2026-04-10 and 2026-04-11 that make the MCP actor-manipulation tools safe to use while the editor is in Play-In-Editor (PIE) mode. Before this work, several Python tool paths would either silently no-op or crash the editor when invoked during PIE.
+
+## What's new
+
+- **`move_actor_smooth`** — tick-based interpolation of an actor's location during PIE. Replaces `tween_location` for runtime use.
+- **`rotate_actor_smooth`** — same shape for rotation.
+- **K9 pipeline integration** — runtime tools are now exposed through K9 alongside the existing edit-mode tools, with a spawn-type fixup so loose class names auto-resolve to shape names.
+
+## Why a redirect was needed
+
+Most of the existing actor ops are implemented in Python and assume the editor world. Inside PIE the world is the game world, transactions behave differently, and `FScopedTransaction` is illegal. Rather than rewrite every Python path, dispatch now **redirects** known actor ops to their C++ equivalents during PIE:
+
+- `tween_location` → `move_actor_smooth` (params translated)
+- All tween commands (rotation, scale, material) now route through the redirect.
+- `FScopedTransaction` is skipped during PIE in `GenActorUtils`.
+- `spawn` is **blocked** during PIE with a clear error rather than silently failing.
+
+This lives in the Python dispatch layer; tools authored in Python see no change to their public API.
+
+## Order of operations
+
+The redirect must initialise before any Python tool path is hit. The `feat: K9 pipeline gains runtime tools + spawn type fixup` commit adjusts startup ordering — keep that in mind if you reshuffle plugin init.
+
+## Documentation that ships with the plugin
+
+Bartosz also added a **critical PIE compatibility warning** to `how_to_use.md` in the plugin tree (commit `4f5bbd5`). Treat that as the source of truth for tool authors; this page summarises the architectural picture.
+
+## See also
+
+- Plugin tree: `KARIANA/Source/.../GenActorUtils/` for the C++ implementations
+- `how_to_use.md` for tool-author guidance

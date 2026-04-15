@@ -1,0 +1,24 @@
+---
+title: "v0.9.21"
+description: "Bedrock endpoint recovery: restore correct API Gateway host and add URL fallback"
+---
+
+Released **2026-04-14** ([PR #466](https://github.com/INGIPSA/KARIANA/pull/466), version bump [PR #467](https://github.com/INGIPSA/KARIANA/pull/467)). **Current shipping version.**
+
+## What happened
+
+After 0.9.19 went out, fresh installs failed to reach Bedrock. The baked-in API Gateway host had been replaced by a stale value during a config edit, and the provider had no fallback path when the primary host returned 504 / resolved to a dead URL.
+
+## Fix
+
+- Restored the correct Bedrock API Gateway host (`9s860bd5ej`).
+- Added a **URL fallback** in the Bedrock provider: if the primary host fails to resolve or returns 5xx on the auth probe, the provider retries against the secondary host before surfacing an error to the user.
+- See [Bedrock endpoint recovery](/development/bedrock-endpoint-recovery) for the fallback mechanics and the playbook for future URL rotations.
+
+## Verification
+
+Fresh Windows install ran end-to-end against a clean user profile — login, model list, and first inference all green. This is the build currently recommended for client delivery.
+
+## Known gaps
+
+- Auto-updater ([issue #465](https://github.com/INGIPSA/KARIANA/issues/465)) is still pending, so 0.9.21 → future versions still require a manual installer run.

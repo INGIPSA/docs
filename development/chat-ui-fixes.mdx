@@ -1,0 +1,25 @@
+---
+title: "Chat UI fixes (0.9.19 run)"
+description: "Streaming, scroll behaviour, daemon mode reset, and C++ toolbar corrections"
+---
+
+Consolidated notes on the chat-UI fixes landed between 2026-04-12 and 2026-04-13.
+
+## Scroll snap during streaming (PR #451)
+
+The chat view used to snap to the bottom on every new token, making it impossible to read earlier output while the model was still streaming. Fix (`fe0aa6c`, Bucz) tracks whether the user has scrolled up and suppresses auto-scroll while they are reading; snap resumes when they scroll back to the bottom themselves.
+
+## Daemon mode reset after "New Chat" + streaming paragraph breaks (PR #456)
+
+Two bugs shipped in the same PR:
+
+- **Daemon reset** — starting a new chat didn't reset the daemon state for the active model, so the new chat saw stale context from the previous session.
+- **Streaming paragraph breaks** — paragraph boundaries weren't being honoured during streaming; they arrived correctly but were rendered as soft wraps. Fix corrects the render path so Markdown paragraph breaks survive the streaming pipeline.
+
+## C++ toolbar corrections (PR #456)
+
+Same PR bundled C++-side fixes to the toolbar and chat widget after the UI refactor — mostly SWidgetSwitcher / invalidation issues that only show up when the user actually interacts with the toolbar during a stream.
+
+## `execute_python_script` re-enabled as experimental (PR #457)
+
+The tool is back on the Bedrock-exposed list with an **experimental** flag. Safe enough for internal and trusted tester use; keep it out of any pitch where a client could run it without understanding the implications. If we ever expose it to SOLO/TEAM customers, it will need a confirmation prompt and sandboxing.

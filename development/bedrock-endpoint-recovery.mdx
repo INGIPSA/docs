@@ -1,0 +1,38 @@
+---
+title: "Bedrock endpoint recovery"
+description: "URL fallback strategy for the Bedrock provider and rotation playbook"
+---
+
+## Background
+
+The Bedrock provider talks to a per-user API Gateway v2 HTTP API fronted by the Lambda `KarianaBedrockAPI`. The Gateway host is baked into the plugin at build time. If the host changes or becomes unreachable, every client shipped with the stale value is bricked until a new installer goes out.
+
+The 0.9.19 → 0.9.21 incident (fresh installs could not reach Bedrock) was caused exactly by this: an edit put a wrong host into the build, and there was no fallback.
+
+## Fallback mechanism (since v0.9.21)
+
+The provider now carries **two** candidate hosts: a primary and a secondary. On startup it runs an auth probe against the primary. If the probe fails with DNS resolution error, TCP timeout, or HTTP 5xx, it transparently fails over to the secondary before surfacing the error to the user.
+
+Key properties:
+
+- Failover is per-process, not per-request. Once a host is chosen for the session, the provider sticks with it.
+- The probe uses the auth endpoint because it is the lightest-weight round-trip that still validates end-to-end reachability.
+- Failover is logged to the plugin log with the reason; telemetry (when we re-introduce it) should also capture the fallback event so we can detect primary outages from the fleet.
+
+## Rotation playbook
+
+When the primary host needs to change (migration, account split, compromise):
+
+1. Stand up the new host and verify from at least one external network.
+2. Update the **secondary** slot in the plugin config first, ship a release, give it a day in the wild.
+3. Confirm via logs that nothing in the field is hitting the secondary unexpectedly.
+4. Promote secondary to primary in the next release; put the **old** primary as secondary for one more release so any client mid-upgrade has a safety net.
+5. Remove the old host two releases later.
+
+Never change both slots in a single release — that defeats the fallback.
+
+## Where this lives
+
+- Provider code: `KARIANA/Source/.../Providers/Bedrock/` (the fallback lives next to the auth probe).
+- Host values are in the build-time provider config, not in user INI. User INI still controls per-user credentials and model preferences.
+- See also [Auth token system](/development/auth-token-system) for how credentials flow once the host is selected.
